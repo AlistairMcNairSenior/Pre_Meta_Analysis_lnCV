@@ -1,13 +1,17 @@
 
-# Simulation to support new analysis looking at step 1 lnCV to improve analysis of lnRR
+# Third simulation to explore the benefits of pre-meta-analysis wtih lnCV for meta-analysis of the lnRR, as described in Senior et al. Bias in meta-analysis of response ratios is reduced by preliminary meta-analysis of the variance. This script runs simulation using multi-level meta-analysis (MLMA), where there are >1 effect sizes per study.
 
-# This script runs the simulation for the MLMA (i.e. multilevel meta-analysis). It is designed to run as an array job on the HPC and Sydney UNI. There are only 10 reps in here, but I ran on an array 0-999
+# Note the script below runs just ten replicates of each parameter set, but the full simulaiton described in text decribes the results for 10k replicates. This is because the script was desihgned to run across 1000 instances on a high performance computer (HPC). The code on lines 11-14 takes the input data from the HPC noting which instance is being run to save the data from this instance. Running it across a HPC in this way will generate 1000 sets of results that must then be aggregated in the next script on a local machine.
+
+# This script can be run in a single instance on a local machine by removing L12, and setting the object 'index' on L14 to 1.
 
 # Clean up the R Environment 
 rm(list=ls())
 
-# Incoming arguments from bash
+# Incoming arguments from bash - note remove this line to run in a single instance on a local machine
 args<-commandArgs()
+# Get the incoming info on the PBS array index - note set this to 1 to run in a single instance on a local machine
+index<-args[6]
 
 # Where are we working
 directory<-"/project/RDS-FSC-EvolNutStrats-RW/Miss_Sim"
@@ -17,11 +21,6 @@ setwd(directory)
 library(metafor)
 library(plyr)
 source("0.Header.R")
-
-# Get the incoming info on the PBS array index
-index<-args[6]
-
-# In this simulation I will include non-independence. The the analysis will be MLMA.
 
 ###################################################
 ################## Parameters #####################
@@ -37,7 +36,7 @@ k_effect_sd<-2.4
 # Specify total tau2 of lnRR^2. This sets 0 at 1 SD below the mean effect meaning there will be a set proportion of negative effects. A large degree of heteorgeneity
 tau2<-c(lnRR^2)
 
-# Specify the % tau2 - 0 and 50%
+# Specify the % tau2 at the study level - 50%
 icc_study<-c(0.5)
 
 # Note I assume the mean in the control group is 100 - to give +ve means for lnRR
@@ -210,5 +209,4 @@ for(p in 1:nrow(parameters)){
 # Save the results from the simulation
 save(results, file=paste0("Simulation_3_", index, ".Rdata"))
 save(parameters, file="Parameters_3.Rdata")
-
 
