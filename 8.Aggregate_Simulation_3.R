@@ -1,5 +1,5 @@
 
-# This script was used to aggregate multiple instances from the array job on the HPC. It also then calculates the bias, coverage and aggregate statsitics used in the plotting
+# This script performs two functions on the data from the third simulation: First it aggregates multiple replicates of the simulation coming from the 1000 sets run on a high performance computer. Second, it also then calculates the bias, coverage and aggregate statsitics from the simulation, which are used in the plotting
 
 # Clean up the R Environment 
 rm(list=ls())
@@ -12,11 +12,15 @@ setwd(wd)
 source("0.Header.R")
 library(plyr)
 
-# Check the files
+# Get the names of the files in the directory for the first simulation (note files 1-4 are scripts and bash files and not needed here)
 files<-dir("Output_Simulation_3")[-c(1:4)]
 
+# Load the first set of replicates manually and save them
 load(paste0("Output_Simulation_3/", files[1]))
 res_unlist<-results
+# The results are in a list object, where each entry in the list comprises a data frame of replicate results for one set of simualtion parameters
+
+# Now use a loop to load the next 999 sets of replicates and save them in to the results object
 for(i in 2:length(files)){
 	load(paste0("Output_Simulation_3/", files[i]))
 	for(j in 1:length(res_unlist)){
@@ -26,10 +30,10 @@ for(i in 2:length(files)){
 }
 results<-res_unlist
 
-# Load the parameters 
+# Load the parameters - this object lets us know the exact set of parameters used for each dataframe in the list of results  
 load("Output_Simulation_3/Parameters_3.Rdata")
 
-# Long format all the results
+# Unpack the list in to one giant data frame in long format
 for(i in 1:length(results)){
 	long_i<-cbind(results[[i]], parameters[i,])
 	if(i == 1){
@@ -41,27 +45,30 @@ for(i in 1:length(results)){
 long_mat<-as.matrix(long)
 
 
-# Pull out the lnCV data
+# Seperate the lnCV meta-analysis results (i.e., pre-meta-analysis) from the lnRR results
 lnCV_long<-as.data.frame(long_mat[,c(9:16,21:32)])
 long_mat<-long_mat[,-c(9:16)]
 lnRR_long<-long_mat
 
-# Save that
+# Save those two seperate sets of results
 save(lnRR_long, file="long_lnRR_simulation_3.Rdata")
 save(lnCV_long, file="long_lnCV_simulation_3.Rdata")
 
-# Reformat from long to wide for the methods
+# Reformat from long to wide for the the different types of analysis (i.e., conventional, n-weighted and MA Weighted)
 long_full<-as.data.frame(rbind(long_mat[,-c(5:12)], long_mat[,-c(1:4,9:12)], long_mat[,-c(1:8)]))
 long_full$Method<-c(rep("Conventional", dim(long_mat)[1]), rep("n Weighted", dim(long_mat)[1]), rep("MA Weighted", dim(long_mat)[1]))
 names(long_full)[c(1:4)]<-c("Ests", "SE", "Tau2", "ICC")
 
-# Calculate the bias and coverage
+# Calculate the bias as the difference between the meta-analystic estimate of lnRR and the known value
 long_full$bias<-long_full$Est - long_full$lnRR
+# Caluclate coverage from 95% CIs based ona t-distribution and a z-distribution, note the latter is presented in text
 dfs<-long_full$k_study-1
 ts<-qt(0.975, df=dfs)
 long_full$coverage_t<-(abs(long_full$bias) - ts*long_full$SE) <= 0
 long_full$coverage_z<-(abs(long_full$bias) - 1.96*long_full$SE) <= 0
+# Calculate bias in the heterogeneity estimate
 long_full$bias_tau2<-long_full$Tau2 - long_full$tau2
+# Calculate bias in the ICC
 long_full$bias_ICC<-long_full$ICC - long_full$icc_study
 
 # Add a unique code for each parameter set
@@ -84,6 +91,6 @@ for(i in 3:12){
 agg_stats<-cbind(agg_stats, parameters[match(agg_stats$code, parameters$code),])
 agg_results<-agg_stats[,-c(1:2)]
 
-# Save that to the githib repo
+# Save that to the githib repo, for plotting in the next script.
 save(agg_results, file="agg_results_simulation_3.Rdata")
 
