@@ -1,39 +1,48 @@
 
-# Simulation to Support Nakagawa et al. A practical and readily implementable method for handling missing standard deviation in the meta-analysis of response ratios. 
+# This is the header file containing functions for the simulation in Senior et al. Bias in meta-analysis of response ratios is reduced by preliminary meta-analysis of the variance. 
 
-# This script contains 2 functions for the simulation
+# This script contains 4 functions that are used at various points in the proceeding sets of scripts.
 
-# First written by AM Senior @ The University of Sydney, 25/06/2021.
+# The first function listed is sim_data
+# The second function listed is my_lnRR
+# The third function listed is my_lnCV
+# The fourth function listed is my_median
+
+# Comments and descriptions for each preceed the code.
 
 ############################################
 ############### sim_data ###################
 ############################################
 
-# The function is designed to simulate data at a multi-level with study and within-study
-# The same function will all for a more standard design by setting k_study as 1, and k_effects the desired nu,ber of studies, and icc_study = 0, giving all the heterogeneity at the effect size level
+# The function is designed to simulate multi-level meta-analytic data. The are simulated hierarchically at the among-study and within-study levels.
 
-# lnRR = the overall mean effect size
-# k_study = the number of studies
-# k_effect_mu = the mean number of effect sizes per study
-# k_effect_sd = the sd in number of effect sizes per study
-# tau2 = the total heterogeneity
-# icc_study = the proportion (intraclass correlation) of tau2 coming from the study level effect 
-# n_study_mu = the mean sample size studies in the dataset
-# n_study_sd = the sd of sample size of studies in the dataset
-# sd_study_mu is the mean sd of data within effect size for each study
-# sd_study_sd is the sd of sd of data within effect size for each study
+# The same function however can be used to simulate single-level data (e.g., a conventional random-effects meta-analysis, where there is just one effect per study) by setting k_effect_mu at 1, k_effect_sd at 0, k_study at the desired number of studies, and icc_study = 1. This parameterisation forces all the heterogeneity at the study level, and there to be no within-study effect sizes.
+
+# The function allows the user to simulate heterogeneous (among-study) differences in sample size and among-sample variances. Note that variances and sample-sizes vary at the level of study rather than effect size (or treatment group). That is all groups/samples within the same study will have the same n and SD.
+
+# The arguments to the function are as follows:
+# lnRR = the overall mean effect size - assumed to be normally distirbuted (i.e., the RR is log-normal)
+# k_study = the number of studies - specifed by the user and in-variant
+# k_effect_mu = the mean number of effect sizes per study - the number of effect sizes is double poisson distributed
+# k_effect_sd = the sd in number of effect sizes per study - the number of effect sizes is double poisson distributed
+# tau2 = the total heterogeneity among effect sizes
+# icc_study = the proportion (intraclass correlation) of tau2 coming from the study level effects 
+# n_study_mu = the mean sample size studies in the dataset - the sample size is double poisson distributed
+# n_study_sd = the sd of sample size of studies in the dataset - the sample size is double poisson distributed
+# sd_study_mu is the mean sd of data within effect size for each study - the sds for samples are assumed to be gamma distributed
+# sd_study_sd is the sd of sd of data within effect size for each study - the sds for samples are assumed to be gamma distributed
 # return_true_effects allows the user to see the simulated effect at the level of each study and effect size in the outputted data
 
-# NOTE SDs and ns vary at the level of study rather than effect size (or treatment group). In my experiuence this is the most realistic scenario
+# Returns a dataframe of sample means, sds and ns for the studies, which can then be used to calculate effect sizes.
 
 sim_data<-function(lnRR, k_study, k_effect_mu, k_effect_sd, tau2, icc_study, n_study_mu, n_study_sd, sd_study_mu, sd_study_sd, return_true_effects=F){
 	
-	# Load the packages
+	# Load the package for the double-poisson distribution
 	require(gamlss.dist)
 	
-	# A bit of reparameterization
+	# Start by reparameterizing a few things.
 	
-	# Make sure the various sds are not <= 0: for the gamma and DPO distributions
+	# Make sure the various sds for the sample size and sample-sd distributions are not <= 0, as this is undefined for the gamma and double poisson distributions
 	if(sd_study_sd <= 0){
 		sd_study_sd<-10^-8
 	}
@@ -52,11 +61,11 @@ sim_data<-function(lnRR, k_study, k_effect_mu, k_effect_sd, tau2, icc_study, n_s
 	a<-sd_study_mu^2 / sd_study_sd^2
 	b<-sd_study_sd^2 / sd_study_mu
 	
-	# For the double poisson distirbution the sigma is parameterised as - I will specify the mean as n_study_mu - 3, then add 3 to avoid 0 sample sizes - same for k_effects. Note the addition of 0.0001 avoids 0 means
+	# For the double poisson distribution the sigma parameter as follows. I will specify the mean as n_study_mu - 3, then add 3 to avoid 0 sample sizes - same for k_effects. Note the addition of 10^-8 avoids 0 means
 	sigma_n<-n_study_sd^2 / (n_study_mu - 3 + 10^-8)
 	sigma_k<-k_effect_sd^2 / (k_effect_mu - 1 + 10^-8)
  	
- 	# Loop for the k studies
+ 	# Loop to do the simulations for the k studies
 	for(i in 1:k_study){
 		
 		# Get the study specific-effect for study i
@@ -67,7 +76,7 @@ sim_data<-function(lnRR, k_study, k_effect_mu, k_effect_sd, tau2, icc_study, n_s
 		n_i<-rDPO(1, mu=(n_study_mu - 3 + 10^-8), sigma=sigma_n) + 3
 		sd_i<-rgamma(1, shape=a, scale=b)
 		
-		# Loop for the k effects
+		# Loop to do the simulations the k effects
 		for(j in 1:k_effect_i){
 			
 			# Get the within-study effects for study i effect size j
@@ -89,7 +98,7 @@ sim_data<-function(lnRR, k_study, k_effect_mu, k_effect_sd, tau2, icc_study, n_s
 				data_ij$sd_i<-sd_i
 			}
 			
-			# Keep a dataframe of all the data
+			# On the first pass create a data variable from the ijth simulaiton, otherwise bind them all together
 			if(i == 1 & j == 1){
 				data<-data_ij
 			}else{
@@ -107,7 +116,19 @@ sim_data<-function(lnRR, k_study, k_effect_mu, k_effect_sd, tau2, icc_study, n_s
 ################ my_lnRR ###################
 ############################################
 
-# Function to calcualte the lnRR based on CV as given in the manuscript
+# Function to calcualte the lnRR based on coefficient of variation (CV) as given in equations 1 and 2 of the manuscript.
+
+# The arguments to the function are as follows:
+# Control.Mean = the mean of the control group
+# Treatment.Mean = the mean of the treatment group
+# Control.CV = the CV of the control group
+# Treatment.CV = the CV of the treatment group
+# Control.n = the sample size of the control group
+# Treatment.n = the sample size of the treatment group
+
+# Note that in the case of effects sizes using the pre-meta-analysis method, the CVs could be estimates, rather than sample specific CVs
+
+# The function returns a vector of two values comprising the estimate of the lnRR and its sampling variance. 
 
 my_lnRR<-function(Control.Mean, Treatment.Mean, Control.CV, Treatment.CV, Control.n, Treatment.n){
 	
@@ -122,12 +143,18 @@ my_lnRR<-function(Control.Mean, Treatment.Mean, Control.CV, Treatment.CV, Contro
 	
 }
 
-
 ############################################
 ################ my_lnCV ###################
 ############################################
 
-# Function to calcualte the lnCV based on CV as given in the manuscript
+# Function to calcualte the lnCV and its sampling variance for a single sample based on CV as given in equations 6 and 7 in the manuscript for pre-meta-analysis
+
+# The function takes the following arguments:
+# Mean = the mean of the smaple
+# SD = the standard deviation of the sample
+# n = the sample size of the sample
+
+# The function returns a vector of two values comprising the estimate of the lnCV and its sampling variance. 
 
 my_lnCV<-function(Mean, SD, n){
 	
@@ -146,24 +173,32 @@ my_lnCV<-function(Mean, SD, n){
 ################ my_median #################
 ############################################
 
-# Function to calcualte the median and 99% CI of x
+# Function to calcualte the median and 99% CI of a set of data. The function uses the following specifcation
+# https://www.statology.org/confidence-interval-for-median/
+
+# The function takes just one argument:
+# x = the input data
+
+# returns a vector of three values comprsing the lower confidence limit, the median, and the upper confidence limit.
 
 my_median<-function(x){
 	
-	# https://www.statology.org/confidence-interval-for-median/
-	
+	# Sort the data and get the sample sizes	
 	x<-sort(x)
 	n<-length(x)
 	
+	# Find the median
 	med<-median(x)
+	
+	# Find the location of the lower CI value and return it.
 	tag<-n*0.5 - 2.58*sqrt(n * 0.5^2)
 	lower<-x[ceiling(tag)]
+	
+	# Find the location of the lower CI value and return it.
 	tag<-n*0.5 + 2.58*sqrt(n * 0.5^2)
 	upper<-x[ceiling(tag)]
+	
+	# Return the vector of values
 	return(c(lower, med, upper))
 	
-	
 }
-
-
-
