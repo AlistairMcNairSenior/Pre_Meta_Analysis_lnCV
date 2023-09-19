@@ -1,13 +1,17 @@
 
-# Simulation to support new analysis looking at step 1 lnCV to improve analysis of lnRR
+# Second simulation to explore the benefits of pre-meta-analysis wtih lnCV for meta-analysis of the lnRR, as described in Senior et al. Bias in meta-analysis of response ratios is reduced by preliminary meta-analysis of the variance. This script runs simulation using standard random-effects meta-analysis (REMA), where there is just one effect size per study, but with missing SD data for a fraction of the studies.
 
-# This script runs the simulation for the MLMA (i.e. multilevel meta-analysis). It is designed to run as an array job on the HPC and Sydney UNI. There are only 10 reps in here, but I ran on an array 0-999
+# Note the script below runs just ten replicates of each parameter set, but the full simulaiton described in text decribes the results for 10k replicates. This is because the script was desihgned to run across 1000 instances on a high performance computer (HPC). The code on lines 11-14 takes the input data from the HPC noting which instance is being run to save the data from this instance. Running it across a HPC in this way will generate 1000 sets of results that must then be aggregated in the next script on a local machine.
+
+# This script can be run in a single instance on a local machine by removing L12, and setting the object 'index' on L14 to 1.
 
 # Clean up the R Environment 
 rm(list=ls())
 
-# Incoming arguments from bash
+# Incoming arguments from bash - note remove this line to run in a single instance on a local machine
 args<-commandArgs()
+# Get the incoming info on the PBS array index - note set this to 1 to run in a single instance on a local machine
+index<-args[6]
 
 # Where are we working
 directory<-"/project/RDS-FSC-EvolNutStrats-RW/Miss_Sim"
@@ -17,11 +21,6 @@ setwd(directory)
 library(metafor)
 library(plyr)
 source("0.Header.R")
-
-# Get the incoming info on the PBS array index
-index<-args[6]
-
-# In this simulation I will include not non-independence. The the analysis will be REMA.
 
 ###################################################
 ################## Parameters #####################
