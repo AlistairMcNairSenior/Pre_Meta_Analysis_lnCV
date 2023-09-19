@@ -9,16 +9,18 @@ library(orchaRd)
 library(gridExtra)
 library(ggbeeswarm)
 
-# Load the FBG data
+# Load the body mass data
 data<-read.csv("Data_Worked_Example_2.csv")
 head(data)
 
 # Calculate the CVs
 data$Cont_CV<-data$Cont_SD/data$Cont_Mean
 data$Treat_CV<-data$Treat_SD/data$Treat_Mean
+
+# Create a unit-level variable to identify each effect size
 data$ES<-paste0("ES_", as.factor(seq(1, nrow(data), 1)))
 
-# Calculate Geary's Index		
+# Calculate Geary's Index following equation 20 in text		
 geary_Control<-1/data$Cont_CV * ((4 * data$Cont_n^(3/2)) / (1 + 4*data$Cont_n))
 geary_Treat<-1/data$Treat_CV * ((4 * data$Treat_n^(3/2)) / (1 + 4*data$Treat_n))
 
@@ -33,7 +35,6 @@ data_lnRR<-cbind(data, my_lnRR(Control.Mean=data$Cont_Mean, Control.CV=data$Cont
 V <- matrix(0,nrow = dim(data_lnRR)[1],ncol = dim(data_lnRR)[1])
 rownames(V) <- data$ES
 colnames(V) <- data$ES
-
 Shared_ids<-unique(data_lnRR$Control_id[which(data_lnRR$Shared_control == "yes")])
 tag<-match(Shared_ids, data_lnRR$Control_id)
 shared_data<-data_lnRR[tag,]
@@ -50,18 +51,20 @@ for(i in 1:length(Shared_ids)){
 	}
 }
 
+# Add the sampling variances in to the diag of the var-cov matrix for shared controls
 diag(V)<-data_lnRR$vi
 
-# Fit conventional analysis 
+# Fit the MLMA using the conventional analysis 
 conv<-rma.mv(yi=yi, V=V, random=list(~1|Study, ~1|Strain, ~1|ES), data=data_lnRR)
 
-# Pre-meta-analysis
+# Pre-meta-analysis - dropping missing SD at this step
+# Start with the pre-analysis of the treatment data
 lnCV_T<-cbind(data, my_lnCV(Mean=data$Treat_Mean, SD=data$Treat_SD, n=data$Treat_n))
 pre_T<-rma.mv(yi=yi, V=vi, random=list(~1|Study, ~1|Strain, ~1|ES), data=lnCV_T)
 pre_T
 sum(pre_T$sigma2)
 
-# I2 for pre treatment lnCV
+# Calculate the I2, using the typical sampling variance
 tsvT<-((nrow(lnCV_T) - 1) * sum(1/lnCV_T$vi)) / (sum(1/lnCV_T$vi)^2 - sum((1/lnCV_T$vi)^2))
 sum(pre_T$sigma2) / (sum(pre_T$sigma2) + tsvT) * 100
 
@@ -82,11 +85,11 @@ sum(pre_C$sigma2) / (sum(pre_C$sigma2) + tsvC) * 100
 # Partition I2
 pre_C$sigma2 / (sum(pre_C$sigma2) + tsvC) * 100
 
-# Get the estimates
+# Get the estimates of the CV in the two groups from the pre-meta-analysis
 CV_T<-exp(pre_T$b[1] + 0.5*sum(pre_T$sigma2))
 CV_C<-exp(pre_C$b[1] + 0.5*sum(pre_C$sigma2))
 
-# Calculate the new sampling variances for lnRR
+# Calculate the sampling variances using the new estimates of CV from the pre-meta-analysis
 data_lnRR$vi_2<-CV_T^2/data$Treat_n + CV_C^2/data$Cont_n + CV_T^4/(2 * data$Treat_n^2) + CV_C^2/(2 * data$Cont_n^2)
 
 # re-create the vcv for the shared controls
@@ -110,16 +113,17 @@ for(i in 1:length(Shared_ids)){
 	}
 }
 
+# Add the new sampling variance in to the diag for var-cov matrix
 diag(V)<-data_lnRR$vi_2
 
-# Refit the model with the pre-meta-analysis
+# Refit with the MLMA for the lnRR with the new sampling variances
 pre_MA<-rma.mv(yi=yi, V=V, random=list(~1|Study, ~1|Strain, ~1|ES), data=data_lnRR)
 
 # Compare the results
 conv
 pre_MA
 
-# Total het
+# Total heterogeneity
 sum(conv$sigma2)
 sum(pre_MA$sigma2)
 
