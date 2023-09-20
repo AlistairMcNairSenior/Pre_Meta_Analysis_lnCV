@@ -1,7 +1,7 @@
 
 # First simulation to explore the benefits of pre-meta-analysis wtih lnCV for meta-analysis of the lnRR, as described in Senior et al. Bias in meta-analysis of response ratios is reduced by preliminary meta-analysis of the variance. This script runs simulation using standard random-effects meta-analysis (REMA), where there is just one effect size per study.
 
-# Note the script below runs just ten replicates of each parameter set, but the full simulaiton described in text decribes the results for 10k replicates. This is because the script was desihgned to run across 1000 instances on a high performance computer (HPC). The code on lines 11-14 takes the input data from the HPC noting which instance is being run to save the data from this instance. Running it across a HPC in this way will generate 1000 sets of results that must then be aggregated in the next script on a local machine.
+# Note the script below runs just 100 replicates of each parameter set, but the full simulaiton described in text decribes the results for 100k replicates. This is because the script was desihgned to run across 1000 instances on a high performance computer (HPC). The code on lines 11-14 takes the input data from the HPC noting which instance is being run to save the data from this instance. Running it across a HPC in this way will generate 1000 sets of results that must then be aggregated in the next script on a local machine.
 
 # This script can be run in a single instance on a local machine by removing L12, and setting the object 'index' on L14 to 1.
 
