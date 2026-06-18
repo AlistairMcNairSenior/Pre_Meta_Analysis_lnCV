@@ -11,7 +11,7 @@ rm(list=ls())
 # Incoming arguments from bash - note remove this line to run in a single instance on a local machine
 args<-commandArgs()
 # Get the incoming info on the PBS array index - note set this to 1 to run in a single instance on a local machine
-index<-args[6]
+index<-args[6] # set index<-1 to run 100 replicates on a single desktop (see also L63 for the number of replicates)
 
 # Where are we working
 directory<-"/project/RDS-FSC-EvolNutStrats-RW/Miss_Sim"
